@@ -4,7 +4,9 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Инициализация бота
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const bot = new Telegraf(process.env.BOT_TOKEN, {
+    polling: true
+});
 
 // Структура данных:
 // players: Map<chatId, Set<playerName>> - список всех игроков в чате
@@ -23,27 +25,29 @@ const texts = {
             '/add_game - Создать новую настольную игру\n' +
             '/add_player - Добавить игрока\n' +
             '/list - Показать список настольных игр\n' +
-            '/add_count - Добавить значение к счетчику\n' +
-            '/delete_game - Удалить настольную игру\n' +
-            '/delete_player - Удалить игрока\n' +
+            '/add_score - Добавить значение к счетчику побед\n' +
+            '/set_score - (Только админ) Установить значение счетчика побед\n' +
+            '/delete_game - (Только админ) Удалить настольную игру\n' +
+            '/delete_player - (Только админ) Удалить игрока\n' +
             '/help - Показать это сообщение',
         help: 'Доступные команды:\n\n' +
             '/add_game - Создать новую настольную игру\n' +
             '/add_player - Добавить игрока\n' +
             '/list - Показать список настольных игр\n' +
-            '/add_count - Добавить значение к счетчику\n' +
-            '/delete_game - Удалить настольную игру\n' +
-            '/delete_player - Удалить игрока\n' +
+            '/add_score - Добавить значение к счетчику\n' +
+            '/set_score - (Только админ) Установить значение счетчика побед\n' +
+            '/delete_game - (Только админ) Удалить настольную игру\n' +
+            '/delete_player - (Только админ) Удалить игрока\n' +
             '/help - Показать это сообщение',
         enterGameName: 'Введите название настольной игры:',
         enterPlayerName: 'Введите имя игрока:',
         gameCreated: (gameName) => `Настольная игра "${gameName}" создана!\n` +
             'Используйте команды:\n' +
             `/add_player - добавить игрока\n` +
-            `/add_count - добавить очки`,
-        gameWrongName: (gameName) => `"${gameName}" - неправильное название для игры!`,
+            `/add_score - добавить очки`,
+        gameWrongName: (gameName) => `"${gameName}" - неправильное название для игры! Введите название игры без слэша.`,
         playerAdded: (playerName) => `Игрок "${playerName}" добавлен!`,
-        playerWrongName: (playerName) => `"${playerName}" - неправильное имя игрока!`,
+        playerWrongName: (playerName) => `"${playerName}" - неправильное имя игрока! Введите имя игрока без слэша.`,
         noGames: 'У вас пока нет созданных настольных игр.',
         noPlayers: 'У вас пока нет добавленных игроков.',
         selectGame: 'Выберите игру:',
@@ -59,12 +63,10 @@ const texts = {
         deletionCancelled: 'Удаление отменено',
         adminOnlyGames: 'Только администраторы могут удалять игры!',
         adminOnlyPlayers: 'Только администраторы могут удалять игроков!',
-        currentScore: (playerName, gameName, score) => 
-            `Текущий счет игрока ${playerName} в игре ${gameName}: ${score}\n` +
-            'Выберите изменение или введите новое значение:',
+        adminOnlyScores: 'Только администраторы могут менять очки!',
         scoreCancelled: 'Установка счета отменена',
         enterCustomScore: (playerName, gameName) => 
-            `Введите новое количество очков для игрока ${playerName} в игре ${gameName}:`,
+            `Введи новое количество очков для игрока ${playerName} в игре ${gameName}:`,
         pleaseEnterNumber: 'Пожалуйста, введите число.',
         operationCancelled: 'Операция отменена'
     },
@@ -74,50 +76,50 @@ const texts = {
             '/add_game - Создать новую GACHI игру\n' +
             '/add_player - Добавить ♂️SLAVE♂️\n' +
             '/list - Показать список GACHI игр\n' +
-            '/add_count - Добавить DICK POINTS\n' +
-            '/delete_game - Удалить GACHI игру\n' +
-            '/delete_player - Удалить ♂️SLAVE♂️\n' +
+            '/add_score - Добавить ♂️FISTING POINTS♂️\n' +
+            '/set_score - (Только ♂️DUNGEON MASTER♂️) Установить ♂️FISTING POINTS♂️' +
+            '/delete_game - (Только ♂️DUNGEON MASTER♂️) Удалить GACHI игру\n' +
+            '/delete_player - (Только ♂️DUNGEON MASTER♂️) Удалить ♂️SLAVE♂️\n' +
             '/help - Показать это сообщение',
         help: '♂️ Доступные команды: ♂️\n\n' +
             '/add_game - Создать новую GACHI игру\n' +
             '/add_player - Добавить ♂️SLAVE♂️\n' +
             '/list - Показать список GACHI игр\n' +
-            '/add_count - Добавить DICK POINTS\n' +
-            '/delete_game - Удалить GACHI игру\n' +
-            '/delete_player - Удалить ♂️SLAVE♂️\n' +
+            '/add_score - Добавить ♂️FISTING POINTS♂️\n' +
+            '/set_score - (Только ♂️DUNGEON MASTER♂️) Установить ♂️FISTING POINTS♂️' +
+            '/delete_game - (Только ♂️DUNGEON MASTER♂️) Удалить GACHI игру\n' +
+            '/delete_player - (Только ♂️DUNGEON MASTER♂️) Удалить ♂️SLAVE♂️\n' +
             '/help - Показать это сообщение',
-        enterGameName: '♂️ Введите название GACHI игры: ♂️',
-        enterPlayerName: '♂️ Введите имя ♂️SLAVE♂️: ♂️',
-        gameCreated: (gameName) => `♂️ GACHI игра "${gameName}" создана! ♂️\n` +
+        enterGameName: '♂️WITH YOUR HAND ♂️ Напиши название GACHI игры: ♂️',
+        enterPlayerName: '♂️WITH YOUR HAND ♂️ Напиши имя ♂️SLAVE♂️: ♂️',
+        gameCreated: (gameName) => `♂️THAT'S AMAZING♂️ ♂️ GACHI игра "${gameName}" создана! ♂️\n` +
             '♂️ Используйте команды: ♂️\n' +
             `/add_player - добавить ♂️SLAVE♂️\n` +
-            `/add_count - добавить DICK POINTS`,
-        gameWrongName: (gameName) => `♂️ You are bad ♂️BOY♂️. "${gameName}" - плохое название для GACHI игры! ♂️`,
-        playerAdded: (playerName) => `♂️ ♂️SLAVE♂️ "${playerName}" добавлен! ♂️`,
-        playerWrongName: (playerName) => `♂️ You are bad ♂️BOY♂️. "${playerName}" - плохое имя для ♂️SLAVE♂️! ♂️`,
-        noGames: '♂️ У вас пока нет GACHI игр! ♂️',
-        noPlayers: '♂️ У вас пока нет ♂️SLAVE♂️! ♂️',
-        selectGame: '♂️ Выберите GACHI игру: ♂️',
-        selectPlayer: '♂️ Выберите ♂️SLAVE♂️: ♂️',
-        selectGameForDeletion: '♂️ Выберите GACHI игру для удаления: ♂️',
-        selectPlayerForDeletion: '♂️ Выберите ♂️SLAVE♂️ для удаления: ♂️',
-        confirmGameDeletion: (gameName) => `♂️ Вы уверены, что хотите удалить GACHI игру "${gameName}"? ♂️\n` +
+            `/add_score - добавить ♂️FISTING POINTS♂️`,
+        gameWrongName: (gameName) => `♂️ You are bad ♂️BOY♂️. "${gameName}" - плохое название для GACHI игры! Введите название игры без слэша. ♂️`,
+        playerAdded: (playerName) => `♂️WELCOME TO THE CLUB, BUDDY♂️ ♂️ ♂️SLAVE♂️ "${playerName}" добавлен! ♂️`,
+        playerWrongName: (playerName) => `♂️ You are bad ♂️BOY♂️. "${playerName}" - плохое имя для ♂️SLAVE♂️! Введите имя игрока без слэша. ♂️`,
+        noGames: '♂️OH SHIT I\'M SORRY♂️ В чате недостаточно GACHI игр! ♂️',
+        noPlayers: '♂️OH SHIT I\'M SORRY♂️ В чате недостаточно ♂️SLAVES♂️! ♂️',
+        selectGame: '♂️ THAT TURNS ME ON ♂️ Выбери GACHI игру: ♂️',
+        selectPlayer: '♂️ THAT\'S AMAZING ♂️ Выбери ♂️SLAVE♂️: ♂️',
+        selectGameForDeletion: '♂️ JUST LUBE IT UP ♂️ Выберите GACHI игру для удаления: ♂️',
+        selectPlayerForDeletion: '♂️ JUST LUBE IT UP ♂️ Выберите ♂️SLAVE♂️ для удаления: ♂️',
+        confirmGameDeletion: (gameName) => `♂️ AHH, LIKE THAT? ♂️ Точно хочешь стереть эту гадкую GACHI игру "${gameName}"? ♂️\n` +
             '♂️ Это действие нельзя отменить! ♂️',
-        confirmPlayerDeletion: (playerName) => `♂️ Вы уверены, что хотите удалить ♂️SLAVE♂️ "${playerName}"? ♂️\n` +
+        confirmPlayerDeletion: (playerName) => `♂️ AHH, LIKE THAT? ♂️ Точно хочешь избавиться от этого ♂️FUCKING SLAVE♂️ "${playerName}"? ♂️\n` +
             '♂️ Это действие нельзя отменить! ♂️',
-        gameDeleted: (gameName) => `♂️ GACHI игра "${gameName}" удалена! ♂️`,
-        playerDeleted: (playerName) => `♂️ ♂️SLAVE♂️ "${playerName}" удален! ♂️`,
-        deletionCancelled: '♂️ Удаление отменено ♂️',
-        adminOnlyGames: '♂️ Только DADDY может удалять GACHI игры! ♂️',
-        adminOnlyPlayers: '♂️ Только DADDY может удалять ♂️SLAVES♂️! ♂️',
-        currentScore: (playerName, gameName, score) => 
-            `♂️ Текущие DICK POINTS ♂️SLAVE♂️ ${playerName} в GACHI игре ${gameName}: ${score} ♂️\n` +
-            '♂️ Выберите изменение или введите новое значение: ♂️',
-        scoreCancelled: '♂️ Установка DICK POINTS отменена ♂️',
+        gameDeleted: (gameName) => `♂️ ANOTHER VICTIM ♂️ GACHI игра "${gameName}" удалена! ♂️`,
+        playerDeleted: (playerName) => `♂️ ANOTHER VICTIM ♂️SLAVE♂️ "${playerName}" удален! ♂️`,
+        deletionCancelled: '♂️OH SHIT I\'M SORRY♂️ ♂️ Не удаляем! ♂️',
+        adminOnlyGames: '♂️WRONG DOOR♂️ \n Только ♂️DUNGEON MASTER♂️ может удалять GACHI игры!',
+        adminOnlyPlayers: '♂️WRONG DOOR♂️ \n Только ♂️DUNGEON MASTER♂️ может удалять ♂️SLAVES♂️!',
+        adminOnlyScores: '♂️WRONG DOOR♂️ \n Только ♂️DUNGEON MASTER♂️ может менять ♂️FISTING POINTS♂️!',
+        scoreCancelled: '♂️OH SHIT I\'M SORRY♂️ Никаких ♂️FISTING POINTS♂️!♂️',
         enterCustomScore: (playerName, gameName) => 
-            `♂️ Введите новое количество DICK POINTS для ♂️SLAVE♂️ ${playerName} в GACHI игре ${gameName}: ♂️`,
-        pleaseEnterNumber: '♂️ Пожалуйста, введите число! ♂️',
-        operationCancelled: '♂️ Операция отменена ♂️'
+            `♂️ Введи новое количество ♂️FISTING POINTS♂️ для ♂️SLAVE♂️ ${playerName} в GACHI игре ${gameName}: ♂️`,
+        pleaseEnterNumber: '♂️WRONG DOOR♂️ Пожалуйста, введите число! ♂️',
+        operationCancelled: '♂️OH SHIT I\'M SORRY♂️ ♂️ Отменено♂️'
     }
 };
 
@@ -316,40 +318,9 @@ setScoreScene.action(/select_player_for_score_(.+)/, async (ctx) => {
         return;
     }
 
-    const game = chatGames.get(gameName);
-
     // Сохраняем выбранного игрока в контексте сцены
     ctx.scene.state.playerName = playerName;
 
-    await ctx.editMessageText(getText(ctx.chat.id, 'enterCustomScore', ctx.scene.state.playerName, ctx.scene.state.gameName));
-});
-
-setScoreScene.action(/score_(-?\d+)/, async (ctx) => {
-    const chatId = ctx.chat.id;
-    const score = parseInt(ctx.match[1]);
-    const gameName = ctx.scene.state.gameName;
-    const playerName = ctx.scene.state.playerName;
-    const chatGames = games.get(chatId);
-    
-    if (!chatGames || !chatGames.has(gameName)) {
-        await ctx.answerCbQuery(getText(chatId, 'operationCancelled'));
-        return;
-    }
-
-    const game = chatGames.get(gameName);
-    game.set(playerName, score);
-    
-    let message = `${gameName}:\n`;
-    for (const [player, playerScore] of game) {
-        message += `${player}: ${playerScore}\n`;
-    }
-    
-    await ctx.editMessageText(message);
-    await saveData();
-    await ctx.scene.leave();
-});
-
-setScoreScene.action('score_custom', async (ctx) => {
     await ctx.editMessageText(getText(ctx.chat.id, 'enterCustomScore', ctx.scene.state.playerName, ctx.scene.state.gameName));
 });
 
@@ -397,12 +368,12 @@ bot.telegram.setMyCommands([
     { command: 'add_game', description: 'Создать новую настольную игру' },
     { command: 'add_player', description: 'Добавить игрока' },
     { command: 'list', description: 'Показать список настольных игр' },
-    { command: 'add_count', description: 'Добавить значение к счетчику' },
+    { command: 'add_score', description: 'Добавить значение к счетчику' },
     { command: 'set_score', description: 'Установить количество очков игрока' },
     { command: 'delete_game', description: 'Удалить настольную игру' },
     { command: 'delete_player', description: 'Удалить игрока' },
     { command: 'help', description: 'Показать справку' },
-    { command: 'set_true_nature', description: 'Переключить режим' }
+    { command: 'set_true_nature', description: 'Включить/Выключить ♂️RIGHT VERSION♂️' }
 ]);
 
 // Обработка команды /start
@@ -420,8 +391,8 @@ bot.command('add_player', async (ctx) => {
     await ctx.scene.enter('add_player');
 });
 
-// Обработка команды /add_count
-bot.command('add_count', async (ctx) => {
+// Обработка команды /add_score
+bot.command('add_score', async (ctx) => {
     const chatId = ctx.chat.id;
     if (!games.has(chatId) || games.get(chatId).size === 0) {
         await ctx.reply(getText(chatId, 'noGames'));
@@ -538,7 +509,7 @@ bot.command('help', async (ctx) => {
 // Обработка команды /set_score
 bot.command('set_score', async (ctx) => {
     if (!await isAdmin(ctx)) {
-        await ctx.reply(getText(chatId, 'adminOnlyPlayers'));
+        await ctx.reply(getText(ctx.chat.id, 'adminOnlyScores'));
         return;
     }
 

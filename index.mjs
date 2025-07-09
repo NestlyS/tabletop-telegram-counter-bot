@@ -1,7 +1,23 @@
-require('dotenv').config();
-const { Telegraf, Scenes, session } = require('telegraf');
-const fs = require('fs').promises;
-const path = require('path');
+import dotenv from 'dotenv';
+dotenv.config();
+import { Telegraf, Scenes, session } from 'telegraf';
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
+import path from 'path';
+import { MailRuCloud } from 'mailru-cloud';
+
+const initCloud = () => {
+    if (!process.env.MAILRU_USERNAME || !process.env.MAILRU_PASSWORD) {
+        return null;
+    }
+
+    return new MailRuCloud({
+        username: process.env.MAILRU_USERNAME, // Полный email
+        password: process.env.MAILRU_PASSWORD, // Пароль приложения (WebDAV)
+    });
+}
+
+const cloud = initCloud();
 
 // Инициализация бота
 const bot = new Telegraf(process.env.BOT_TOKEN, {
@@ -191,8 +207,14 @@ async function loadData() {
     }
 }
 
-// Загружаем данные при запуске
-loadData();
+// При запуске: сначала пробуем из облака, если не вышло — локально
+(async () => {
+    await downloadDataFromCloud(); // если не получилось — просто будет старый файл
+    await loadData(); // всегда читаем локальный data.json
+})();
+
+// Каждые 60 минут — выгружаем в облако
+setInterval(uploadDataToCloud, 60 * 60 * 1000);
 
 // Создаем сцены для обработки ввода
 const addTabletopScene = new Scenes.BaseScene('add_game');
@@ -718,3 +740,43 @@ bot.launch(() => {
 // Включаем graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+async function downloadDataFromCloud() {
+    if (!cloud) {
+        console.warn('Нет данных для подключения к облаку. Ничего не будет загружено.');
+        return false;
+    }
+
+    try {
+        const stream = await cloud.file.download('/tabletop-bot/data.json');
+        const chunks = [];
+        for await (const chunk of stream) {
+            chunks.push(chunk);
+        }
+        await fs.writeFile('data.json', Buffer.concat(chunks));
+        console.log('Данные успешно загружены из облака!');
+        return true;
+    } catch (e) {
+        console.error('Ошибка загрузки из облака:', e.message);
+        return false;
+    }
+}
+
+async function uploadDataToCloud() {
+    if (!cloud) {
+        console.warn('Нет данных для подключения к облаку. Ничего не будет выгружено.');
+        return false;
+    }
+
+    try {
+        await cloud.file.upload(
+        createReadStream('./data.json'),
+        '/tabletop-bot/data.json'
+        );
+        console.log('Данные успешно выгружены в облако!');
+        return true;
+    } catch (e) {
+        console.error('Ошибка выгрузки в облако:', e.message);
+        return false;
+    }
+}

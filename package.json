@@ -2,12 +2,14 @@
   "name": "tabletop-counter-bot",
   "version": "1.0.0",
   "description": "Telegram bot for managing tabletops and counters",
-  "main": "index.js",
+  "type": "module",
+  "main": "index.mjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.mjs"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
+    "mailru-cloud": "^1.0.2",
     "node-telegram-bot-api": "^0.66.0",
     "telegraf": "^4.16.3"
   }
